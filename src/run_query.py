@@ -6,6 +6,8 @@ from datetime import datetime
 from openai import OpenAI
 from dotenv import load_dotenv
 
+from src.safety import sanitize_user, final_gate
+
 load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -74,9 +76,19 @@ def safe_metrics(usage, latency_ms, costo):
 
 if __name__ == "__main__":
     pregunta = input("Escribe la pregunta del cliente: ")
+    pregunta_segura = sanitize_user(pregunta)
     
-    response, latency_ms = response_question(pregunta)
+    response, latency_ms = response_question(pregunta_segura)
     resultado = parse_response(response)
+
+    gate_result = final_gate(resultado.get("answer", ""))
+    if gate_result['action'] == "bloquear":
+        resultado = {
+            "answer": "Respuesta bloqueada por motivos de seguridad.",
+            "confidence": 0.0,
+            "actions": ["revisar_manualmente"]
+        }
+
     costo = calculate_cost(response.usage)
     
     safe_metrics(response.usage, latency_ms, costo)
